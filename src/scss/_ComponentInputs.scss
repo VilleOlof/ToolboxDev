@@ -1,0 +1,38 @@
+@use './Variables' as Vars;
+$InputBackground: #212126;
+
+@mixin SettingStyle {
+    width: 20em;
+
+    background-color: $InputBackground;
+    color: #e7e7e7;
+
+    border-color: darken($InputBackground, 5%);
+    border-radius: 0.25rem;
+
+    padding: 0.4em;
+
+    filter: drop-shadow(0 0 0.2em #00000046);
+}
+
+@mixin SettingFocus {
+    &:focus {
+        outline: none;
+        border-color: $InputBackground;
+    }
+}
+
+@mixin SettingInvalid {
+    &:invalid + span::after {
+        position: absolute;
+        content: "✖";
+        padding-left: 5px;
+        color: #8b0000;
+    }
+}
+
+@mixin SettingCalendarIndicator {
+    &::-webkit-calendar-picker-indicator {
+        background-color: rgb(0, 0, 0, 0.1);
+    }
+}

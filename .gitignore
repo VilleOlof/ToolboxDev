@@ -1,0 +1,6 @@
+node_modules/
+dist/
+docs/
+/Data.json
+/Settings.json
+InstallerBuilds/
