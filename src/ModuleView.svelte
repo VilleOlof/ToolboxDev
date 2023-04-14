@@ -11,7 +11,7 @@
 
 <main>
     <div id="columnContainer">
-        <div class="column is-large">
+        <div class="column">
             <DevModule/>
         </div>
     </div>
@@ -80,12 +80,12 @@
         } 
     }
 
-    .is-large {
+    :global(.is-large) {
         max-width: 20rem;
         min-width: 20rem;
     }
 
-    .is-small {
+    :global(.is-small) {
         max-width: 5rem;
         min-width: 5rem;
     }

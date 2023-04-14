@@ -5,5 +5,7 @@ export namespace ModuleHandler {
         Large = "Large"
     }
 
-    export function RegisterModule(moduleName: string, componentSize: ComponentSize): void {}
+    export function RegisterModule(moduleName: string, componentSize: ComponentSize): void {
+        document.querySelector(`#${moduleName}`).parentElement.classList.add(`is-${componentSize.toLowerCase()}`);
+    }
 }
