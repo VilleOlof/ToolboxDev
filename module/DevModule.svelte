@@ -9,10 +9,12 @@
 
     import { onMount } from 'svelte';
 
-    const componentID: string = "TemplateModule";
+    const componentID: string = "MarkerTool";
 
     onMount(() => {
-        ModuleHandler.RegisterModule(componentID, ModuleHandler.ComponentSize.Large);
+        ModuleHandler.RegisterModule(componentID, ModuleHandler.ComponentSize.Small,
+            ""
+        );
     });
 
 
