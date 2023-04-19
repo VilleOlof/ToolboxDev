@@ -1,3 +1,5 @@
+import { Common } from "../Lib/Common";
+
 /**
  * A record of all the data stores that have been created.
  */
@@ -60,7 +62,7 @@ export class DataStore {
      */
     private _Subscribers: Record<string, CallbackFunction[]> = {};
 
-    private static _JSONSavePath: string = "../../Data.json";
+    private static _JSONSavePath: string = "/../Data.json";
 
     /**
      * Notifies all subscribers of a data change.
@@ -81,13 +83,8 @@ export class DataStore {
         }
     }
 
-    private static SaveToJSON(jsonString: string): void {
-        const fs = require("fs");
-        fs.writeFileSync(__dirname + this._JSONSavePath, jsonString, (err) => {
-            if (err) {
-                console.log(err);
-            }
-        });
+    private static SaveToFile(content: any): void {
+        Common.IO.WriteFile(__dirname + this._JSONSavePath, content, true);
     }
 
     /**
@@ -108,11 +105,13 @@ export class DataStore {
      * this.Set("Key", "Value");
      * ```
      */
-    public Set(key: string, value: any = undefined, notify: boolean = true, save: boolean = true): void {
+    public Set<T>(key: string, value: T = undefined, notify: boolean = true, save: boolean = true): T {
         if (this._Data === undefined) this._Data = {};
         this._Data[key] = value;
         if (notify) this.Notify(key, value);
         if (this.SaveUponChange || save) this.Save();
+
+        return value;
     };
 
     /**
@@ -167,7 +166,7 @@ export class DataStore {
             settings[this._ComponentID] = this._Data;
 
             const json: string = JSON.stringify(settings, null, 4);
-            DataStore.SaveToJSON(json);
+            DataStore.SaveToFile(settings);
             return;
         }
 
@@ -182,13 +181,11 @@ export class DataStore {
             allData[key] = dataStore._Data;
         }
 
-        const json: string = JSON.stringify(allData, null, 4);
-
-        this.SaveToJSON(json);
+        DataStore.SaveToFile(allData);
     }
 
     /**
-     * Deletes the data for a key and removes it from local storage.
+     * Deletes the data for a key.
      * 
      * @param key The key of the data to delete.
      * @param notify Whether or not to notify subscribers of the change.
@@ -199,12 +196,13 @@ export class DataStore {
      * ```
      */
     public Delete(key: string, notify: boolean = false) {
-        localStorage.removeItem(this._ComponentID);
         delete this._Data[key];
 
         if (notify) {
             this.Notify(key, undefined);
         }
+
+        this.Save();
     };
 
     /**

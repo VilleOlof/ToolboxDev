@@ -1,4 +1,6 @@
-const PluginID =  "com.villeolof.toolboxdev";
+import { Common } from "./Common";
+
+let PluginID: string;
 const WorkflowIntegration = require('../src/Lib/WorkflowIntegration.node'); //Runs from the /dist directory
 
 /**
@@ -12,10 +14,13 @@ export let Resolve: Resolve;
  * This should be called by the Plugin at startup
  */
 export function InitPlugin(): boolean {
+    PluginID = "com.villeolof.toolboxdev";
+
     const isInitialized = WorkflowIntegration.Initialize(PluginID);
     console.log(`Plugin initialized: ${isInitialized}`);
 
     Resolve = WorkflowIntegration.GetResolve();
+    //ResolveWorkerHandler.Init();
 
     return isInitialized;
 }
@@ -43,6 +48,34 @@ export function QuitResolve(): void {
  */
 export function PluginCleanUp(): void {
     WorkflowIntegration.CleanUp();
+}
+
+/**
+ * Quits the Plugin  
+ * And saves the current window size and position
+ * 
+ * @param quitResolve Whether or not to quit Resolve
+ */
+export function AppQuit(quitResolve: boolean = false): void {
+    // AppSettings.SetSetting('WindowSize', {
+    //     width: window.innerWidth,
+    //     height: window.innerHeight
+    // })
+
+    // const position = Common.Electron.GetCurrentWindow().getPosition();
+    // AppSettings.SetSetting('WindowPosition', {
+    //     x: position[0],
+    //     y: position[1]
+    // });
+
+    if (quitResolve) {
+        QuitResolve();
+    }
+    else {
+        PluginCleanUp();
+    }
+
+    Common.Electron.GetCurrentWindow().close();
 }
 
 /**
@@ -151,8 +184,8 @@ export class ResolveFunctions {
      * let currentTimeline: Timeline = ResolveFunctions.GetCurrentTimeline();
      * ```
      */
-    public static GetCurrentTimeline(): Timeline {
-        this.GetCurrentProject();
+    public static GetCurrentTimeline(fetchNewProject: boolean = true): Timeline {
+        if (fetchNewProject) this.GetCurrentProject();
         this.CurrentTimeline = this.CurrentProject.GetCurrentTimeline();
         return this.CurrentTimeline;
     }
@@ -296,6 +329,17 @@ export class ResolveFunctions {
                     this.ForceUpdateSubscribeType(ResolveFunctions.SubscribeTypes[SubscribeTypeKey]);
                 }
             });
+
+            //TODO
+            if (!Resolve.GetVersionString()) {
+                // @ts-ignore // it thinks that 'remote' is not a property of 'electron'
+                const app = require('electron').remote.app;
+                QuitResolve();
+
+                app.relaunch();
+                app.exit();
+            }
+
         }, delaySeconds * 1000);
 
         return dataLoop;

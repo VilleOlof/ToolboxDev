@@ -1,4 +1,7 @@
-// Some undocumented types were taken from: https://gist.github.com/bradcordeiro/2f00120fad252a1b2bffcb882c9c941b
+//Davinci Resolve Version: 18.1.5
+
+// Some undocumented detailed types were taken from: https://gist.github.com/bradcordeiro/2f00120fad252a1b2bffcb882c9c941b
+// **Undocumented** types were taken from: https://forum.blackmagicdesign.com/viewtopic.php?f=21&t=113040
 
 /**
  * Enum types for DaVinci Resolve related things.
@@ -373,34 +376,34 @@ declare type RenderSettings = {
     /**
      * (when set True, the settings MarkIn and MarkOut are ignored)
      */
-    SelectAllFrames: boolean;
+    SelectAllFrames?: boolean;
 
-    MarkIn: number;
-    MarkOut: number;
+    MarkIn?: number;
+    MarkOut?: number;
 
-    TargetDir: string;
-    CustomName: string;
+    TargetDir?: string;
+    CustomName?: string;
 
     /**
      * 0 - Prefix, 1 - Suffix.
      */
-    UniqueFilenameStyle: 0 | 1;
+    UniqueFilenameStyle?: 0 | 1;
 
-    ExportVideo: boolean;
-    ExportAudio: boolean;
+    ExportVideo?: boolean;
+    ExportAudio?: boolean;
 
-    FormatWidth: number;
-    FormatHeight: number;
+    FormatWidth?: number;
+    FormatHeight?: number;
 
     /**
      * (examples: 23.976, 24)
      */
-    FrameRate: number;
+    FrameRate?: number;
 
     /**
      * (for SD resolution: “16_9” or “4_3”) (other resolutions: “square” or “cinemascope”)
      */
-    PixelAspectRatio: string
+    PixelAspectRatio?: string
 
     /**
      * possible values for current codec (if applicable):  
@@ -408,47 +411,47 @@ declare type RenderSettings = {
      * * [1 -> MAX] (int) - will set input bit rate
      * * [“Least”, “Low”, “Medium”, “High”, “Best”] (String) - will set input quality level
      */
-    VideoQuality: 0 | 1 | Number.MAX_SAFE_INTEGER |"Least" | "Low" | "Medium" | "High" | "Best";
+    VideoQuality?: 0 | 1 | Number.MAX_SAFE_INTEGER |"Least" | "Low" | "Medium" | "High" | "Best";
 
     /**
      * (example: “aac”)
      */
-    AudioCodec: string;
+    AudioCodec?: string;
 
-    AudioBitDepth: number;
-    AudioSampleRate: number;
+    AudioBitDepth?: number;
+    AudioSampleRate?: number;
 
     /**
      * (example: “Same as Project”, “AstroDesign”)
      */
-    ColorSpaceTag: string;
+    ColorSpaceTag?: string;
 
     /**
      * (example: “Same as Project”, “ACEScct”)
      */
-    GammaTag: string;
+    GammaTag?: string;
 
-    ExportAlpha: boolean;
+    ExportAlpha?: boolean;
 
     /**
      *  (example: “Main10”). Can only be set for H.264 and H.265.
      */
-    EncodingProfile: string;
+    EncodingProfile?: string;
 
     /**
      * Can only be set for H.264
      */
-    MultiPassEncode: boolean;
+    MultiPassEncode?: boolean;
 
     /**
      * 0 - Premultipled, 1 - Straight. Can only be set if “ExportAlpha” is true.
      */
-    AlphaMode: 0 | 1;
+    AlphaMode?: 0 | 1;
 
     /**
      * Only supported by QuickTime and MP4 formats.
      */
-    NetworkOptimization: boolean;
+    NetworkOptimization?: boolean;
 };
 
 /**
@@ -494,6 +497,10 @@ declare type ClipInfo = {
     startFrame: number;
     endFrame: number;
     mediaType?: number = 1 | 2;
+    
+    //**Undocumented**//
+    trackIndex?: number;
+    recordFrame?: number;
 }
 
 /**
@@ -974,6 +981,30 @@ declare type Resolve = {
      * ```
     */
     Quit(): void;
+
+    /**
+     * **Undocumented**
+     */
+    GetShowAllVideoFrames(): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param enabled
+     */
+    SetShowAllVideoFrames(enabled: boolean): boolean;
+
+    /**
+     * **Undocumented**
+     */
+    GetSourceViewerMode(): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param enabled 
+     */
+    SetSourceViewerMode(mode: string): boolean;
 };
 
 declare type ProjectManager = {
@@ -1278,6 +1309,18 @@ declare type Project = {
      * Refreshes LUT List
      */
     RefreshLUTList(): boolean;
+
+    /**
+     * **Undocumented**
+     */
+    GetPlaybackSpeed(): number;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param uniqueID 
+     */
+    GetTimelineFromUniqueID(uniqueID: string): Timeline;
 
 };
 declare type MediaStorage = {
@@ -1813,6 +1856,71 @@ declare type Timeline = {
      * Grabs stills from all the clips of the timeline at ‘stillFrameSource’ (1 - First frame, 2 - Middle frame). Returns the list of GalleryStill objects.
      */
     GrabAllStills(stillFrameSource: 1 | 2): GalleryStill[];
+
+    /**
+     * **Undocumented**
+     * 
+     * @param trackType 
+     * @param audioChannelSubType 
+     */
+    AddTrack(trackType: ResolveEnums.TrackType, audioChannelSubType: string): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param trackType 
+     * @param trackIndex 
+     */
+    DeleteTrack(trackType: ResolveEnums.TrackType, trackIndex: number): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param trackType 
+     * @param trackIndex 
+     * @param enabled 
+     */
+    SetTrackEnable(trackType: ResolveEnums.TrackType, trackIndex: number, enabled: boolean): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param trackType 
+     * @param trackIndex 
+     */
+    GetIsTrackEnabled(trackType: ResolveEnums.TrackType, trackIndex: number): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param trackType 
+     * @param trackIndex 
+     * @param locked 
+     */
+    SetTrackLock(trackType: ResolveEnums.TrackType, trackIndex: number, locked: boolean): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param trackType 
+     * @param trackIndex 
+     */
+    GetIsTrackLocked(trackType: ResolveEnums.TrackType, trackIndex: number): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param items 
+     * @param linked 
+     */
+    SetClipsLinked(items: [], linked: boolean): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param items 
+     */
+    DeleteClips(items: []): boolean;
 };
 
 declare type TimelineItem = {
@@ -2081,6 +2189,64 @@ declare type TimelineItem = {
      * Updates sidecar file for BRAW clips or RMD file for R3D clips.
      */
     UpdateSidecar(): boolean;
+
+    /**
+     * Applies ARRI CDL and LUT. Returns True if successful, False otherwise.
+     */
+    ApplyArriCdlLut(): boolean;
+
+    /**
+     * Sets clip enabled based on argument.
+     * 
+     * @param enabled the enabled status
+     */
+    SetClipEnabled(enabled: boolean): boolean;
+
+    /**
+     * Gets clip enabled status.
+     */
+    GetClipEnabled(): boolean;
+
+    /**
+     * Returns the label of the node at nodeIndex.
+     * 
+     * @param nodeIndex the node index
+     */
+    GetNodeLabel(nodeIndex: number): string
+
+    /**
+     * Loads user defined data burn in preset for clip when supplied presetName (string). Returns true if successful.
+     * 
+     * @param presetName the preset name
+     */
+    LoadBurnInPreset(presetName: string): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param nodeIndex 
+     * @param locked 
+     */
+    SetNodeLocked(nodeIndex: number, locked: boolean): boolean;
+
+    /**
+     * **Undocumented**
+     */
+    ResetCurrentVersion(): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param nodeIndex 
+     */
+    ResetNode(nodeIndex: number): boolean;
+
+    /**
+     * **Undocumented**
+     * 
+     * @param nodeIndex 
+     */
+    SetNodeActive(nodeIndex: number): boolean;
 };
 
 declare type Gallery = {

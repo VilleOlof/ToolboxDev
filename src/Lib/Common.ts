@@ -1,5 +1,5 @@
 import { ChildProcess } from "child_process";
-import { BrowserWindow } from "electron";
+import { App, BrowserWindow, Shell } from "electron";
 
 const electron = require("electron");
 const fs = require("fs");
@@ -47,12 +47,48 @@ export namespace Common {
          * let file: {[key: string]: number} = Common.IO.ReadFile<{[key: string]: number}>("path/to/file", true);
          * ```
          */
-        export function ReadFile<T>(path: string, json?: boolean): string | T {
+        export function ReadFile<T = string>(path: string, json?: boolean): T {
             let file: string = fs.readFileSync(path, "utf8");
-            if (!file) return "";
+            if (!file) {
+                console.log(`[Common.IO.ReadFile] File not found: ${path}`);
+                return undefined;
+            }
 
             if (json) return <T>JSON.parse(file);
-            return file;
+            return <T>file;
+        }
+
+        /**
+         * Writes a file to the file system.
+         * If content is not a string it will be converted to JSON by default.
+         * 
+         * @param path the path to the file
+         * @param content the content to write to the file
+         * @param json write the file as JSON if true
+         * 
+         * @example
+         * ```typescript
+         * // Writing a file as a string
+         * Common.IO.WriteFile("path/to/file", "content");
+         * 
+         * // Writing a file as JSON
+         * Common.IO.WriteFile("path/to/file", { "key": "value" }, true);
+         * ```
+         */
+        export function WriteFile(path: string, content: any, json?:boolean, stringifyContentDefault: boolean = true): void {
+            if ((json || typeof content != "string") && stringifyContentDefault) content = JSON.stringify(content, null, 4);
+            
+            fs.writeFileSync(path, content, "utf8");
+        }
+
+        /**
+         * Checks if a file exists.
+         * 
+         * @param path the path to the file
+         * @returns true if the file exists
+         */
+        export function FileExists(path: string): boolean {
+            return fs.existsSync(path);
         }
 
         /**
@@ -89,7 +125,7 @@ export namespace Common {
          * Common.IO.OpenFolder("path/to/folder", "/select, "file.txt");
          * ```
          */
-        export function OpenFolder(filePath: string, _arguments: string[], onlyArguments: boolean = false): void {
+        export function OpenFolder(filePath: string, _arguments?: string[], onlyArguments: boolean = false): void {
             const fileManager: string = process.platform === "win32" ? "explorer" : "open";
 
             if (filePath) filePath = filePath.replace(/\//g, path.sep);
@@ -123,7 +159,7 @@ export namespace Common {
          * Common.IO.OpenFile("path/to/file", "/select, "file.txt");
          * ```
          */
-        export function OpenFile(filePath: string, _arguments: string[], onlyArguments: boolean = false): void {
+        export function OpenFile(filePath: string, _arguments?: string[], onlyArguments: boolean = false): void {
             OpenFolder(filePath, _arguments, onlyArguments);
         }
 
@@ -239,9 +275,18 @@ export namespace Common {
          * let app: Electron.App = Common.Electron.GetApp();
          * ```
          */
-        export function GetApp(): any {
+        export function GetApp(): App {
             /* @ts-ignore */
             return electron.remote.app;
+        }
+
+        /**
+         * Gets the current electron shell.
+         * 
+         * @returns the current electron shell
+         */
+        export function GetShell(): Shell {
+            return electron.shell;
         }
     }
 
@@ -301,9 +346,9 @@ export namespace Common {
      * @param values the values to format the string with
      * @returns the formatted string
      */
-    export function FormatString<T>(string: string, ...values: T[]) {
+    export function FormatString(string: string, ...values: string[]) {
         for (let index: number = 0; index < values.length; index++) {
-            string = string.replace(`{${index}}`, `${values[index]}`);
+            string = string.replace(`{${index}}`, values[index]);
         }
         return string;
     }
