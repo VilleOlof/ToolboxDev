@@ -444,6 +444,23 @@ export class ResolveFunctions {
         if (!this.CheckIfSubscribeTypeExists(SubscribeType)) return;
         ResolveFunctions._ChangeCallbacks[SubscribeType].forEach(callback => callback(object));
     }
+
+    public static ConvertTimecodeToFrames(timecode: string, framerate?: number): number {
+        let timecodeArray: string[] = timecode.split(":");
+
+        if (!framerate) framerate = parseInt(this.GetCurrentTimeline().GetSetting("timelineFrameRate"));
+
+        let hours: number = parseInt(timecodeArray[0]);
+        let minutes: number = parseInt(timecodeArray[1]);
+        let seconds: number = parseInt(timecodeArray[2]);
+        let frames: number = parseInt(timecodeArray[3]);
+
+        frames += seconds * framerate;
+        frames += minutes * framerate * 60;
+        frames += hours * framerate * 60 * 60;
+
+        return frames;
+    }
 }
 
 /**

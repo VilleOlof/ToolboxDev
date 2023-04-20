@@ -1,9 +1,8 @@
 // Modules to control application life and create native browser window
-const {app, BrowserWindow, nativeImage} = require('electron')
+const {app, BrowserWindow, ipcMain, globalShortcut, ipcRenderer} = require('electron')
 const path = require('path')
 const os = require('os')
 const fs = require('fs')
-
 
 function createWindow () {
     // Create the browser window.
@@ -15,7 +14,9 @@ function createWindow () {
             preload: path.join(__dirname, './preload.js'),
             // NOTE: Replace the below variable with a more secure implementation. Reference: https://www.electronjs.org/docs/tutorial/security
             nodeIntegration: true,
-            enableRemoteModule: true
+            enableRemoteModule: true,
+            contextIsolation: false,
+            sandbox: false
         }
     })
 
@@ -33,10 +34,48 @@ function createWindow () {
     mainWindow.webContents.openDevTools()
 }
 
+// ipcMain.on('keybind:set', (event, keybind, callback) => {
+//     // if (!app.isReady()) return;
+//     // if (globalShortcut.isRegistered(keybind)) return;
+    
+//     globalShortcut.register(keybind, () => {
+//         let win = BrowserWindow.getAllWindows()[0];
+//         win.show();
+//     })
+// });
+
+
+ipcMain.handle('keybind:set', (event, keybind, callback) => {
+
+    globalShortcut.register(keybind, () => {
+        const { Events } = require('../Electron/events');
+        let a = Events.Emit(`keybind:${keybind}`, keybind);
+
+        //mainWindow.webContents.send(`keybind:${keybind}`, keybind);
+        //ipcMain.send(`keybind:${keybind}`, keybind);
+        fs.appendFileSync(__dirname + '/keybind.txt', `${Events.Emit}, ${a}, ${keybind}`);
+
+        let win = BrowserWindow.getAllWindows()[0];
+        win.show();
+    });
+});
+
+let _emitEvent = null;
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', createWindow)
+app.on('ready', () => {
+    createWindow();
+
+    // const { Events } = require('../Electron/events');
+    // fs.writeFileSync(__dirname + '/keybind.txt', Events.Emit);
+    // _emitEvent = Events.Emit;
+})
+
+app.on('will-quit', () => {
+    // Unregister all shortcuts.
+    globalShortcut.unregisterAll();
+});
 
 // Quit when all windows are closed.
 app.on('window-all-closed', function () {
