@@ -7,7 +7,6 @@ const path = require('path');
 const crypto = require('crypto');
 
 const { exec, spawn } = require("child_process");
-
 /**
  * "Common" provides a set of simple functions that can be used by any module.  
  * These are meant to be simple functions.  
@@ -289,7 +288,6 @@ export namespace Common {
             return electron.shell;
         }
 
-        const { Events } = require('./../Electron/events');
         /**
          * Registers a shortcut.
          * 
@@ -297,11 +295,9 @@ export namespace Common {
          * @param callback the callback to execute when the key is pressed
          */
         export function RegisterShortcut(key: globalThis.Electron.Accelerator, callback: () => void): void {
-            electron.ipcRenderer.send("keybind:set", key, callback);
             electron.ipcRenderer.invoke('keybind:set', key);
-            Events.Register(`keybind:${key}`, callback);
 
-            //electron.ipcRenderer.on(`keybind:${key}`, callback);
+            electron.ipcRenderer.on(`keybind:${key}`, callback);
         }
 
         /**
@@ -310,7 +306,8 @@ export namespace Common {
          * @param key the key to unregister
          */
         export function UnregisterShortcut(key: globalThis.Electron.Accelerator): void {
-            if (electron.globalShortcut.isRegistered(key)) electron.globalShortcut.unregister(key);
+            electron.ipcRenderer.invoke('keybind:unset', key);
+            electron.ipcRenderer.removeAllListeners(`keybind:${key}`);
         }
 
         /**

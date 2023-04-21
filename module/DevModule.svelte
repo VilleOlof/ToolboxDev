@@ -7,175 +7,206 @@
     import { ModuleHandler } from '../src/Lib/ModuleHandler';
     import { Common } from '../src/Lib/Common';
 
-    import { onDestroy, onMount } from 'svelte';
+    import { onMount } from 'svelte';
 
-    const componentID: string = "MarkerTool";
+    const componentID: string = "Timer";
 
     onMount(() => {
-        ModuleHandler.RegisterModule(componentID, ModuleHandler.ComponentSize.Small,
-            "Used to create specific markers used by other modules."
-        );
+        ModuleHandler.RegisterModule(componentID, ModuleHandler.ComponentSize.Large);
 
-        console.log(StartMarkerShortcut);
-        Common.Electron.RegisterShortcut(StartMarkerShortcut, function StartMarkerKey() {
-            console.log("Start Marker Shortcut Pressed");
-            CreateStartMarker();
-        });
-
-        // Common.Electron.RegisterShortcut(EndMarkerShortcut, () => {
-        //     CreateEndMarker();
-        // });
+        //CountdownInputChange();
     });
 
-    onDestroy(() => {
-        Common.Electron.UnregisterShortcut(StartMarkerShortcut);
-        Common.Electron.UnregisterShortcut(EndMarkerShortcut);
-    });
+    type Page = 'Timer' | 'Countdown';
 
     let _Settings = GlobalSettings.GetInstance(componentID);
-    
-    let MarkerColors: string[] = Object.keys(ResolveEnums.MarkerColor);
-    let StartColor: string = _Settings.RegisterSetting("Start Marker Color", "The color of the first, start marker", "Green", SettingTypes.Type.Dropdown, <SettingTypes.Dropdown>{ Options: MarkerColors});
-    let EndColor: string = _Settings.RegisterSetting("End Marker Color", "The color of the second, end marker", "Red", SettingTypes.Type.Dropdown, <SettingTypes.Dropdown>{ Options: MarkerColors});
+    let _Datastore = new DataStore(componentID);
 
-    let StartMarkerShortcut: string = _Settings.RegisterSetting(
-        'Start Marker Keybind', 
-        'The keybind used to create the start marker', 
-        '1', 
-        SettingTypes.Type.Keybind, 
-        <SettingTypes.Keybind>{defaultModifierOne: SettingTypes.KeybindModifier.Control, defaultModifierTwo: SettingTypes.KeybindModifier.Alt}
-    );
-    let EndMarkerShortcut: string = _Settings.RegisterSetting(
-        'End Marker Keybind', 
-        'The keybind used to create the end marker', 
-        '2', 
-        SettingTypes.Type.Keybind, 
-        <SettingTypes.Keybind>{defaultModifierOne: SettingTypes.KeybindModifier.Control, defaultModifierTwo: SettingTypes.KeybindModifier.Alt}
+    let SaveDataInterval: number = _Settings.RegisterSetting(
+        'Save Data Interval', 
+        'When to save the data, every X seconds', 
+        5, 
+        SettingTypes.Type.Numeric, 
+        <SettingTypes.Numeric>{ Min: 1 }
     );
 
-    function GetPlayHeadFrame(timeline?: Timeline): number {
-        let currentTimeline: Timeline = timeline ?? ResolveFunctions.GetCurrentTimeline();
-        let playHead: string = currentTimeline.GetCurrentTimecode();
+    let PageState = _Datastore.Get<Page>('PageState', 'Timer');
+    let currentTime = _Datastore.Get<number>(`currentTime-${PageState}`, 0);
+    let countDownLength = _Datastore.Get<number>('countDownLength', 5);
+    let currentInterval: NodeJS.Timer;
 
-        let playHeadFrame: number = ResolveFunctions.ConvertTimecodeToFrames(playHead);
-
-        playHeadFrame -= currentTimeline.GetStartFrame();
-
-        return playHeadFrame;
+    function GetReversePageState(): Page {
+        return PageState == 'Timer' ? 'Countdown' : 'Timer';
     }
 
-    function CheckIfMarkerExists(markerData: string): boolean {
-        let timeline: Timeline = ResolveFunctions.GetCurrentTimeline();
-        let markers = timeline.GetMarkers();
+    function SwitchPageState() {
+        PageState = GetReversePageState();
+        _Datastore.Set('PageState', PageState);
 
-        for (const [frameID, MarkerData] of Object.entries(markers)) {
-            if (MarkerData.customData == markerData) return true;
+        currentTime = _Datastore.Get<number>(`currentTime-${PageState}`, 0);
+
+        Stop();
+    }
+
+    function Start() {
+        if (currentInterval) return;
+
+        StartInterval();
+    }
+
+    function Stop() {
+        if (!currentInterval) return;
+
+        clearInterval(currentInterval);
+        currentInterval = null;
+    }
+
+    function Reset() {
+        Stop();
+        if (PageState == 'Countdown') {
+            currentTime = countDownLength * 60;
+        } else {
+            currentTime = 0;
+        }
+        _Datastore.Set(`currentTime-${PageState}`, currentTime);
+    }
+
+    function StartInterval() {
+        let interval: number = 0;
+        currentInterval = setInterval(() => {
+            if (PageState == 'Timer') {
+                currentTime += 1;
+            } else {
+                currentTime -= 1;
+            }
+            interval += 1;
+
+            if (interval >= SaveDataInterval) {
+                _Datastore.Set(`currentTime-${PageState}`, currentTime);
+                interval = 0;
+            }
+        }, 1000);
+    }
+
+    let formattedTime: string = FormatTime();
+
+    $: {
+        currentTime = currentTime;
+        formattedTime = FormatTime();
+    }
+
+    function FormatTime() {
+        let time = currentTime;
+        let hours = Math.floor(time / 3600);
+        time -= hours * 3600;
+        let minutes = Math.floor(time / 60);
+        time -= minutes * 60;
+        let seconds = time;
+
+        let hoursString = hours.toString().padStart(2, '0');
+        let minutesString = minutes.toString().padStart(2, '0');
+        let secondsString = seconds.toString().padStart(2, '0');
+
+        return `${hoursString}:${minutesString}:${secondsString}`;
+    }
+
+    let CountdownInputElement: HTMLInputElement;
+    function CountdownInputChange() {
+        if (PageState != 'Countdown') {
+            return;
+        }
+        if (currentInterval) return;
+
+        let value = parseInt(CountdownInputElement.value);
+        if (isNaN(value)) {
+            value = 0;
         }
 
-        return false;
-    }
+        countDownLength = value;
 
-    const StartMarkerData: string = "MarkerTool-StartMarker";
-    function CreateStartMarker(): void {
-        let timeline: Timeline = ResolveFunctions.GetCurrentTimeline();
-        let playHeadPosition = GetPlayHeadFrame(timeline);
+        _Datastore.Set('countDownLength', countDownLength);
 
-        if (CheckIfMarkerExists(StartMarkerData)) timeline.DeleteMarkerByCustomData(StartMarkerData);
-
-        timeline.AddMarker(
-            playHeadPosition,
-            StartColor,
-            "Start Marker",
-            "A Generated Marker By The MarkerTool Module",
-            1,
-            StartMarkerData
-        );
-    }
-
-    const EndMarkerData: string = "MarkerTool-EndMarker";
-    function CreateEndMarker(): void {
-        let timeline: Timeline = ResolveFunctions.GetCurrentTimeline();
-        let playHeadPosition = GetPlayHeadFrame(timeline);
-
-        if (CheckIfMarkerExists(EndMarkerData))  timeline.DeleteMarkerByCustomData(EndMarkerData);
-        
-        timeline.AddMarker(
-            playHeadPosition,
-            EndColor,
-            "End Marker",
-            "A Generated Marker By The MarkerTool Module",
-            1,
-            EndMarkerData
-        );
-    }
-
-    function ClearBothMarkers(): void {
-        let timeline: Timeline = ResolveFunctions.GetCurrentTimeline();
-        timeline.DeleteMarkerByCustomData("MarkerTool-StartMarker");
-        timeline.DeleteMarkerByCustomData("MarkerTool-EndMarker");
+        Reset();
     }
 
 </script>
 
 
-<main id={componentID} style={`--startColor: ${StartColor};--endColor: ${EndColor}`}>
-    <h1 id=title>Marker Tool</h1>
+<main id={componentID}>
+    <div id=topBar>
+        <button class=buttonStyle on:click={SwitchPageState}>Switch To {PageState == 'Timer' ? 'Countdown' : 'Timer'}</button>
+        <h1>{PageState}</h1>
+    </div>
 
-    <button id="startMarkerButton" class=markerButton on:click={CreateStartMarker}>Start</button>
-    <button id="endMarkerButton" class=markerButton on:click={CreateEndMarker}>End</button>
+    <h1 id="time">{formattedTime}</h1>
 
-    <button id="clearMarkersButton" on:click={ClearBothMarkers}>Clear Markers</button>
+    <div id="bottomBar">
+        <button class=buttonStyle on:click={Start}>Start</button>
+        <button class=buttonStyle on:click={Stop}>Stop</button>
+        <button class=buttonStyle on:click={Reset}>Reset</button>
+        {#if PageState == 'Countdown'}
+            <input type="number" id="countdownStartInput" placeholder="Minutes" bind:value={countDownLength} on:change={CountdownInputChange} bind:this={CountdownInputElement}>
+        {/if}
+    </div>
+
 </main>
 
 
 <style lang="scss">
-    @use "../src/scss/Colors";
-    @use "sass:color";
+    @use '../src/scss/Colors';
 
     main {
         display: flex;
         flex-direction: column;
-        align-items: center;
+        
         justify-content: center;
+        align-items: center;
+
+        width: 100%;
     }
 
-    #title {
-        opacity: 0.5;
-        font-size: 0.75rem;
+    #topBar {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
 
-        margin: 0.3rem;
-        margin-bottom: 0;
-    }
+        width: 100%;
 
-    // #startMarkerButton {
-    //     background-color: var(--startColor);
-    // }
+        h1 {
+            font-size: 1.5rem;
+        }
 
-    // #endMarkerButton {
-    //     background-color: var(--endColor);
-    // }
-
-    #clearMarkersButton {
-        margin: 0.5rem;
-        margin-top: 1rem;
-        padding: 0.25rem;
-
-        background-color: Colors.$ColumnColor;
-        color: Colors.$TextColor;
-
-        border-radius: 0.25rem;
-        border-color: Colors.$BackgroundColor;
-
-        outline: none;
-
-        font-size: 0.75rem;
-
-        &:hover {
-            background-color: darken(Colors.$ColumnColor, 5%);
+        & > * {
+            margin: 0.25rem 1rem;
         }
     }
 
-    .markerButton {
+    #bottomBar {
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+
+        width: 100%;
+
+        margin: 0.25rem 1rem;
+
+        & > * {
+            margin: 0.25rem 0.4rem;
+        }
+    }
+
+    #time {
+        font-size: 3.75rem;
+        margin: 0.5rem 1rem;
+    }
+
+    input {
+        max-width: 4rem;
+    }
+
+    .buttonStyle {
         background-color: Colors.$ColumnColor;
         color: Colors.$TextColor;
 
@@ -186,22 +217,19 @@
 
         font-size: 0.8rem;
 
-        margin: 0.35rem 0rem;
+        margin: 0rem 0.25rem;
+        padding: 0.2rem 0.5rem;
 
-        min-width: 4rem;
-        min-height: 2rem;
+        min-width: 3rem;
 
         cursor: pointer;
 
-        transition: transform 0.1s ease-in-out;
+        transition: background-color 0.1s ease-in-out;
 
         &:hover {
-            transform: scale(1.1);
-        }
-
-        &:active {
-            transform: scale(0.95);
+            background-color: Colors.$BackgroundColor;
         }
     }
+
 
 </style>

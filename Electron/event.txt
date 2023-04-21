@@ -1,4 +1,0 @@
-() => {
-      console.log("Start Marker Shortcut Pressed");
-      CreateStartMarker();
-    }, 1, [object Object]: {}

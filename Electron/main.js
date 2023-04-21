@@ -34,42 +34,21 @@ function createWindow () {
     mainWindow.webContents.openDevTools()
 }
 
-// ipcMain.on('keybind:set', (event, keybind, callback) => {
-//     // if (!app.isReady()) return;
-//     // if (globalShortcut.isRegistered(keybind)) return;
-    
-//     globalShortcut.register(keybind, () => {
-//         let win = BrowserWindow.getAllWindows()[0];
-//         win.show();
-//     })
-// });
-
-
-ipcMain.handle('keybind:set', (event, keybind, callback) => {
-
+ipcMain.handle('keybind:set', (event, keybind) => {
     globalShortcut.register(keybind, () => {
-        const { Events } = require('../Electron/events');
-        let a = Events.Emit(`keybind:${keybind}`, keybind);
-
-        //mainWindow.webContents.send(`keybind:${keybind}`, keybind);
-        //ipcMain.send(`keybind:${keybind}`, keybind);
-        fs.appendFileSync(__dirname + '/keybind.txt', `${Events.Emit}, ${a}, ${keybind}`);
-
-        let win = BrowserWindow.getAllWindows()[0];
-        win.show();
+        BrowserWindow.getAllWindows()[0].webContents.send(`keybind:${keybind}`, keybind);
     });
 });
 
-let _emitEvent = null;
+ipcMain.handle('keybind:unset', (event, keybind) => {
+    globalShortcut.unregister(keybind);
+});
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
     createWindow();
-
-    // const { Events } = require('../Electron/events');
-    // fs.writeFileSync(__dirname + '/keybind.txt', Events.Emit);
-    // _emitEvent = Events.Emit;
 })
 
 app.on('will-quit', () => {
