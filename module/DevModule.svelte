@@ -9,227 +9,164 @@
 
     import { onMount } from 'svelte';
 
-    const componentID: string = "Timer";
+    const componentID: string = "QuickProperties";
+
+    /*
+        QuickProperties
+
+        - TimelineItemProperties
+
+        # Add new Quick Property
+
+        #List of added saved property objects: & > * (property name, minimize)
+        # - Apply to current video item (button)
+        # - Enable if it can be used with Keybinds (if so auto add in settings) (checkbox)
+        # - Set Properties to current video item properties (button)
+        # - Property Name (input:text)
+        # - Append if possible (checkbox)
+        # - What Tracks to apply to (mutiple choices, 1,2,3,4,5,6)
+        # - Remove Current
+    */
 
     onMount(() => {
         ModuleHandler.RegisterModule(componentID, ModuleHandler.ComponentSize.Large);
 
-        //CountdownInputChange();
+        RegisterKeybinds();
     });
 
-    type Page = 'Timer' | 'Countdown';
+    type Property = {
+        KeybindEnabled: boolean,
+        Name: string,
+        Append: boolean,
+        Tracks: number[],
+        ItemProperties: TimelineItemProperties | undefined
+    }
+    type PropertyObject = {[key: string]: Property};
 
     let _Settings = GlobalSettings.GetInstance(componentID);
     let _Datastore = new DataStore(componentID);
 
-    let SaveDataInterval: number = _Settings.RegisterSetting(
-        'Save Data Interval', 
-        'When to save the data, every X seconds', 
-        5, 
-        SettingTypes.Type.Numeric, 
-        <SettingTypes.Numeric>{ Min: 1 }
-    );
+    let _Properties: PropertyObject = _Datastore.Get("Properties", {});
+    $: _Datastore.Set("Properties", _Properties); // Save to datastore on change
 
-    let PageState = _Datastore.Get<Page>('PageState', 'Timer');
-    let currentTime = _Datastore.Get<number>(`currentTime-${PageState}`, 0);
-    let countDownLength = _Datastore.Get<number>('countDownLength', 5);
-    let currentInterval: NodeJS.Timer;
-
-    function GetReversePageState(): Page {
-        return PageState == 'Timer' ? 'Countdown' : 'Timer';
+    type KeybindReturn = {
+        Keybind: string,
+        Properties: Property
     }
+    function AddKeybindSettingsOnMount(): KeybindReturn[] {
+        let keybinds: KeybindReturn[] = [];
+        for (let key in _Properties) {
+            let property = _Properties[key];
 
-    function SwitchPageState() {
-        PageState = GetReversePageState();
-        _Datastore.Set('PageState', PageState);
-
-        currentTime = _Datastore.Get<number>(`currentTime-${PageState}`, 0);
-
-        Stop();
-    }
-
-    function Start() {
-        if (currentInterval) return;
-
-        StartInterval();
-    }
-
-    function Stop() {
-        if (!currentInterval) return;
-
-        clearInterval(currentInterval);
-        currentInterval = null;
-    }
-
-    function Reset() {
-        Stop();
-        if (PageState == 'Countdown') {
-            currentTime = countDownLength * 60;
-        } else {
-            currentTime = 0;
-        }
-        _Datastore.Set(`currentTime-${PageState}`, currentTime);
-    }
-
-    function StartInterval() {
-        let interval: number = 0;
-        currentInterval = setInterval(() => {
-            if (PageState == 'Timer') {
-                currentTime += 1;
-            } else {
-                currentTime -= 1;
+            if (property.KeybindEnabled) {
+                let keybind = _Settings.RegisterSetting(`${property.Name}-Keybind`, `Generated Keybind for the ${property.Name} property`, '', SettingTypes.Type.Keybind);
+                keybinds.push({Keybind: keybind, Properties: property});
             }
-            interval += 1;
+        }
 
-            if (interval >= SaveDataInterval) {
-                _Datastore.Set(`currentTime-${PageState}`, currentTime);
-                interval = 0;
+        return keybinds;
+    }
+
+    function RegisterKeybinds(): void {
+        let keybindReturn = AddKeybindSettingsOnMount();
+        for (let property of keybindReturn) {
+            Common.Electron.RegisterShortcut(property.Keybind, () => {
+                ApplyProperties(property.Properties);
+            });
+        }
+    }
+
+    function AddNewProperty(): Property {
+        const newPropertyName = "New Property";
+        let newProperty = {
+            KeybindEnabled: false,
+            Name: newPropertyName,
+            Append: false,
+            Tracks: [1],
+            ItemProperties: undefined
+        };
+        _Properties[newPropertyName] = newProperty;
+
+        return newProperty;
+    }
+
+    function AddItemProperties(properties: Property): Property {
+        let currentTimeline = ResolveFunctions.GetCurrentTimeline();
+
+        let currentVideoItem = currentTimeline.GetCurrentVideoItem();
+
+        let currentProperties: TimelineItemProperties = currentVideoItem.GetProperty() as TimelineItemProperties;
+        console.log(currentProperties);
+
+        _Properties[properties.Name] = {
+            KeybindEnabled: properties.KeybindEnabled,
+            Name: properties.Name,
+            Append: properties.Append,
+            Tracks: properties.Tracks,
+            ItemProperties: currentProperties
+        }
+
+        return _Properties[properties.Name];
+    }
+
+    function ApplyProperties(properties: Property): void {
+        let currentTimeline = ResolveFunctions.GetCurrentTimeline();
+        let timelineTrackCount = currentTimeline.GetTrackCount(ResolveEnums.TrackType.Video);
+
+        let itemProps = properties.ItemProperties;
+        for (let propertyTrackCount = 1; propertyTrackCount <= properties.Tracks.length; propertyTrackCount++) {
+            if (propertyTrackCount >= timelineTrackCount) {
+                return;
             }
-        }, 1000);
-    }
 
-    let formattedTime: string = FormatTime();
+            let itemsInTrack = currentTimeline.GetItemListInTrack(ResolveEnums.TrackType.Video, propertyTrackCount);
 
-    $: {
-        currentTime = currentTime;
-        formattedTime = FormatTime();
-    }
+            //find the item thats above the timeline cursor
+            let playheadPosition = ResolveFunctions.ConvertTimecodeToFrames(currentTimeline.GetCurrentTimecode());
+            for (let item of itemsInTrack) {
+                if (!item) {
+                    continue;
+                }
+                let itemStart = item.GetStart();
+                let itemEnd = item.GetEnd();
 
-    function FormatTime() {
-        let time = currentTime;
-        let hours = Math.floor(time / 3600);
-        time -= hours * 3600;
-        let minutes = Math.floor(time / 60);
-        time -= minutes * 60;
-        let seconds = time;
+                if (playheadPosition >= itemStart && playheadPosition <= itemEnd) {
+                    
+                    Object.entries(itemProps).forEach(([key, value]) => {
+                        if (value === undefined) return;
 
-        let hoursString = hours.toString().padStart(2, '0');
-        let minutesString = minutes.toString().padStart(2, '0');
-        let secondsString = seconds.toString().padStart(2, '0');
+                        if (properties.Append) {
+                            let currentValue = item.GetProperty(key);
 
-        return `${hoursString}:${minutesString}:${secondsString}`;
-    }
+                            if (currentValue === undefined) return;
+                            if (currentValue.toString() == "true" || currentValue.toString() == "false") return; //probably a better way to 
+                            
+                            value = currentValue + value;
+                            item.SetProperty(key, value);
 
-    let CountdownInputElement: HTMLInputElement;
-    function CountdownInputChange() {
-        if (PageState != 'Countdown') {
-            return;
+                            return;
+                        }
+
+                        item.SetProperty(key, value);
+                    });
+
+                    break;
+                }
+            }
         }
-        if (currentInterval) return;
-
-        let value = parseInt(CountdownInputElement.value);
-        if (isNaN(value)) {
-            value = 0;
-        }
-
-        countDownLength = value;
-
-        _Datastore.Set('countDownLength', countDownLength);
-
-        Reset();
     }
+
 
 </script>
 
 
 <main id={componentID}>
-    <div id=topBar>
-        <button class=buttonStyle on:click={SwitchPageState}>Switch To {PageState == 'Timer' ? 'Countdown' : 'Timer'}</button>
-        <h1>{PageState}</h1>
-    </div>
-
-    <h1 id="time">{formattedTime}</h1>
-
-    <div id="bottomBar">
-        <button class=buttonStyle on:click={Start}>Start</button>
-        <button class=buttonStyle on:click={Stop}>Stop</button>
-        <button class=buttonStyle on:click={Reset}>Reset</button>
-        {#if PageState == 'Countdown'}
-            <input type="number" id="countdownStartInput" placeholder="Minutes" bind:value={countDownLength} on:change={CountdownInputChange} bind:this={CountdownInputElement}>
-        {/if}
-    </div>
-
+    <button on:click={AddNewProperty}>add new</button>
+    <button on:click={() => { AddItemProperties(_Properties["New Property"]) }}>add properties</button>
+    <button on:click={() => { ApplyProperties(_Properties["New Property"]) }}>test apply</button>
 </main>
 
 
 <style lang="scss">
-    @use '../src/scss/Colors';
-
-    main {
-        display: flex;
-        flex-direction: column;
-        
-        justify-content: center;
-        align-items: center;
-
-        width: 100%;
-    }
-
-    #topBar {
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-
-        width: 100%;
-
-        h1 {
-            font-size: 1.5rem;
-        }
-
-        & > * {
-            margin: 0.25rem 1rem;
-        }
-    }
-
-    #bottomBar {
-        display: flex;
-        flex-direction: row;
-        justify-content: flex-start;
-        align-items: center;
-
-        width: 100%;
-
-        margin: 0.25rem 1rem;
-
-        & > * {
-            margin: 0.25rem 0.4rem;
-        }
-    }
-
-    #time {
-        font-size: 3.75rem;
-        margin: 0.5rem 1rem;
-    }
-
-    input {
-        max-width: 4rem;
-    }
-
-    .buttonStyle {
-        background-color: Colors.$ColumnColor;
-        color: Colors.$TextColor;
-
-        border-radius: 0.25rem;
-        border-color: Colors.$BackgroundColor;
-
-        outline: none;
-
-        font-size: 0.8rem;
-
-        margin: 0rem 0.25rem;
-        padding: 0.2rem 0.5rem;
-
-        min-width: 3rem;
-
-        cursor: pointer;
-
-        transition: background-color 0.1s ease-in-out;
-
-        &:hover {
-            background-color: Colors.$BackgroundColor;
-        }
-    }
-
 
 </style>

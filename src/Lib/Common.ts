@@ -1,5 +1,7 @@
 import { ChildProcess } from "child_process";
 import { App, BrowserWindow, Shell } from "electron";
+import { DataStore } from "../Stores/DataStore";
+import { GlobalSettings, Settings } from "./Settings";
 
 const electron = require("electron");
 const fs = require("fs");

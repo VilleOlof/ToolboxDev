@@ -1983,7 +1983,7 @@ declare type TimelineItem = {
     /**
      * returns the value of the specified key if no key is specified, the method returns TimelineItemProperties
      */
-    GetProperty(propertyKey?: string): number | TimelineItemProperties
+    GetProperty(propertyKey?: string): number | boolean | TimelineItemProperties
     
     /**
      * Creates a new marker at given frameId position and with given marker information. ‘customData’ is optional and helps to attach user specific data to the marker.
