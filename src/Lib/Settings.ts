@@ -292,6 +292,7 @@ namespace SettingTypes {
         'Alt' = 'Alt',
         'Control' = 'CommandOrControl',
         'Shift' = 'Shift',
+        'None' = ''
     }
     
     /**
@@ -418,7 +419,7 @@ class Settings {
         //Loads the default value for keybinds
         if (type == SettingTypes.Type.Keybind) {
             ExtraData = ExtraData as SettingTypes.Keybind;
-            defaultValue = Common.Electron.GetShortCutAccelerator(ExtraData.defaultModifierOne, ExtraData.defaultModifierTwo, defaultValue);
+            defaultValue = Common.Electron.GetShortCutAccelerator(ExtraData?.defaultModifierOne ?? SettingTypes.KeybindModifier.None, ExtraData?.defaultModifierTwo ?? SettingTypes.KeybindModifier.None, defaultValue);
         }
 
         if (loadOldValues) {
