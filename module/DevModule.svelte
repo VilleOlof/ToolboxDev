@@ -8,282 +8,134 @@
     import { Common } from '../src/Lib/Common';
 
     import { onMount } from 'svelte';
-    import { onDestroy } from "svelte";
 
-    const componentID: string = "QuickProperties";
-
-    /*
-        QuickProperties
-
-        - TimelineItemProperties
-
-        # Add new Quick Property
-
-        #List of added saved property objects: & > * (property name, minimize)
-        # - Apply to current video item (button)
-        # - Enable if it can be used with Keybinds (if so auto add in settings) (checkbox)
-        # - Set Properties to current video item properties (button)
-        # - Property Name (input:text)
-        # - Append if possible (checkbox)
-        # - What Tracks to apply to (mutiple choices, 1,2,3,4,5,6)
-        # - Remove Current
-    */
+    const componentID: string = "Clamp";
 
     onMount(() => {
-        ModuleHandler.RegisterModule(componentID, ModuleHandler.ComponentSize.Large);
+        ModuleHandler.RegisterModule(componentID, ModuleHandler.ComponentSize.Small,
+            "Used to clamp a video to fit the screen border exactly."
+        );
 
-        RegisterKeybinds();
-
-        UpdateTrackInputsOnMount();
+        Common.Electron.RegisterShortcut(clampKeybind, () => {
+            Clamp();
+        });
     });
-
-    onDestroy(() => {
-    });
-
-    type Property = {
-        KeybindEnabled: boolean,
-        Name: string,
-        Append: boolean,
-        Tracks: number[],
-        ItemProperties: TimelineItemProperties | undefined
-    }
-    type PropertyObject = {[key: string]: Property};
 
     let _Settings = GlobalSettings.GetInstance(componentID);
-    let _Datastore = new DataStore(componentID);
 
-    let _Properties: PropertyObject = _Datastore.Get("Properties", {});
-    $: {
-        for (const [oldName, properties] of Object.entries(_Properties)) {
-            if (oldName != properties.Name) {
-                _Properties[properties.Name] = properties;
-                delete _Properties[oldName];
-            }
+    let trackAmount = _Settings.RegisterSetting(
+        'Tracks', 
+        'The amount of tracks to clamp (1->)', 
+        1, 
+        SettingTypes.Type.Numeric, 
+        <SettingTypes.Numeric>{ Min: 1 }
+    );
+
+    let clampKeybind = _Settings.RegisterSetting(
+        'Clamp Keybind', 
+        'The key to clamp the video', 
+        '3', 
+        SettingTypes.Type.Keybind, 
+        <SettingTypes.Keybind>{ 
+            defaultModifierOne: SettingTypes.KeybindModifier.Shift, 
+            defaultModifierTwo: SettingTypes.KeybindModifier.Alt
         }
+    );
 
-        _Datastore.Set("Properties", _Properties); // Save to datastore on change
-    }
+    function Clamp() {
+        const currentTimeline = ResolveFunctions.GetCurrentTimeline();
+        const currentProject = ResolveFunctions.GetCurrentProject();
+        const timelineTrackAmount = currentTimeline.GetTrackCount(ResolveEnums.TrackType.Video);
 
-    type KeybindReturn = {
-        Keybind: string,
-        Properties: Property
-    }
-    function AddKeybindSettingsOnMount(): KeybindReturn[] {
-        RemoveUnusedKeybinds(); //remove any keybinds that dont exist in _properties
-
-        let keybinds: KeybindReturn[] = [];
-        for (let key in _Properties) {
-            let property = _Properties[key];
-
-            if (property.KeybindEnabled) {
-                let keybind = _Settings.RegisterSetting(`${property.Name}-Keybind`, `Generated Keybind for the ${property.Name} property`, 'F24', SettingTypes.Type.Keybind);
-                keybinds.push({Keybind: keybind, Properties: property});
-            }
-        }
-
-        return keybinds;
-    }
-
-    function RegisterKeybinds(): void {
-        let keybindReturn = AddKeybindSettingsOnMount();
-        for (let property of keybindReturn) {
-            Common.Electron.RegisterShortcut(property.Keybind, () => {
-                ApplyProperties(property.Properties);
-            });
-        }
-    }
-
-    function RemoveUnusedKeybinds(): void {
-        //check existing setting keybind and compare them to _properties and if they dont exist in _properties then remove them
-        let settings: Record<string, SettingTypes.Info> = _Settings.GetAllComponentSettings();
-
-        for (let setting in settings) {
-            if (setting.endsWith("-Keybind")) {
-                let propertyName = setting.replace("-Keybind", "");
-                if (_Properties[propertyName] === undefined || !_Properties[propertyName].KeybindEnabled) {
-                    _Settings.DeleteSetting(setting);
-                }
-            }
-        }
-    }
-
-    function AddNewProperty(): Property {
-        const newPropertyName = "New Property";
-        let newProperty = {
-            KeybindEnabled: false,
-            Name: newPropertyName,
-            Append: false,
-            Tracks: [1],
-            ItemProperties: undefined
-        };
-        newProperty = AddItemProperties(newProperty);
-
-        _Properties[newPropertyName] = newProperty;
-
-        return newProperty;
-    }
-
-    function RemoveProperty(propertyName: string): void {
-        delete _Properties[propertyName];
-        _Properties = _Properties; //force update since $: triggers on assignment
-    }
-
-    function AddItemProperties(properties: Property): Property {
-        let currentTimeline = ResolveFunctions.GetCurrentTimeline();
-
-        let currentVideoItem = currentTimeline.GetCurrentVideoItem();
-        if (!currentVideoItem) return properties;
-
-        let currentProperties: TimelineItemProperties = currentVideoItem.GetProperty() as TimelineItemProperties;
-
-        _Properties[properties.Name] = {
-            KeybindEnabled: properties.KeybindEnabled,
-            Name: properties.Name,
-            Append: properties.Append,
-            Tracks: properties.Tracks,
-            ItemProperties: currentProperties
-        }
-
-        return _Properties[properties.Name];
-    }
-
-    //refactor to more functions instead of 6 level of indentation
-    function ApplyProperties(properties: Property): void {
-        let currentTimeline = ResolveFunctions.GetCurrentTimeline();
-        let timelineTrackCount = currentTimeline.GetTrackCount(ResolveEnums.TrackType.Video);
-
-        let itemProps = properties.ItemProperties;
-        for (let propertyTrackCount = 1; propertyTrackCount <= properties.Tracks.length; propertyTrackCount++) {
-            if (propertyTrackCount >= timelineTrackCount) {
+        for (let currentTrackIndex = 1; currentTrackIndex <= trackAmount; currentTrackIndex++) {
+            if (currentTrackIndex >= timelineTrackAmount) {
                 return;
             }
 
-            let itemsInTrack = currentTimeline.GetItemListInTrack(ResolveEnums.TrackType.Video, propertyTrackCount);
+            const currentTrackItems = currentTimeline.GetItemListInTrack(ResolveEnums.TrackType.Video, currentTrackIndex);
 
-            //find the item thats above the timeline cursor
-            let playheadPosition = ResolveFunctions.ConvertTimecodeToFrames(currentTimeline.GetCurrentTimecode());
-            for (let item of itemsInTrack) {
+            const playHeadPosition = ResolveFunctions.ConvertTimecodeToFrames(currentTimeline.GetCurrentTimecode());
+
+            for (let item of currentTrackItems) {
                 if (item === undefined) continue;
 
                 let itemStart = item.GetStart();
                 let itemEnd = item.GetEnd();
 
-                if (playheadPosition >= itemStart && playheadPosition <= itemEnd) {
-                    
-                    const ZoomGang = item.GetProperty("ZoomGang");
-                    Object.entries(itemProps).forEach(([key, value]) => {
-                        if (value === undefined || value == 0) return;
+                if (playHeadPosition >= itemStart && playHeadPosition <= itemEnd) {
+                    // Clamp the item, still a bit unsure how this exactly works but its from old scripts.
+                    //should also take crop into account but that is not implemented yet.
 
-                        if (properties.Append) {
-                            let currentValue = item.GetProperty(key);
+                    const ZoomLevel = item.GetProperty("ZoomX") as number;
+                    const PanLevel = item.GetProperty("Pan") as number;
+                    const TiltLevel = item.GetProperty("Tilt") as number;
 
-                            if (currentValue === undefined || currentValue == 0) return;
-                            if (currentValue.toString() == "true" || currentValue.toString() == "false") return; //probably a better way to 
-                            if (ZoomGang && key == "ZoomY") return;
+                    const TimelineResolutionX = parseInt(currentProject.GetSetting('timelineResolutionWidth')) / 2;
+                    const TimelineResolutionY = parseInt(currentProject.GetSetting('timelineResolutionHeight')) / 2;
 
-                            if (key == "ZoomX") {
-                                value -= 1; //removes the 1 that is default zoom level.
-                            }
-                            
-                            value = currentValue + value;
-                            item.SetProperty(key, value);
+                    const Pan = TimelineResolutionX * (ZoomLevel - 1);
+                    const Tilt = TimelineResolutionY * (ZoomLevel - 1);
 
-                            return;
-                        }
+                    if (Math.abs(PanLevel) > Pan) {
+                        const newPan = Pan * (PanLevel < 0 ? -1 : 1);
+                        item.SetProperty("Pan", newPan);
+                    }
 
-                        console.log(key, value);
-                        item.SetProperty(key, value);
-                    });
-
-                    break;
+                    if (Math.abs(TiltLevel) > Tilt) {
+                        const newTilt = Tilt * (TiltLevel < 0 ? -1 : 1);
+                        item.SetProperty("Tilt", newTilt);
+                    }
                 }
             }
         }
-    }
-
-    function TrackInputChange(event: any, _propertiesName: string): void {
-        let trackInputText: string = event.target.value;
-
-        let tracks: number[] = [];
-
-        let trackInputTextSplit = trackInputText.split(",");
-        for (let track of trackInputTextSplit) {
-            let trackNumber = parseInt(track);
-            if (trackNumber > 0) {
-                tracks.push(trackNumber);
-            }
-        }
-
-        _Properties[_propertiesName].Tracks = tracks;
-    }
-
-    function UpdateTrackInputsOnMount() {
-        for (const [propertyName, properties] of Object.entries(_Properties)) {
-            let trackInput = document.querySelector(`#${propertyName.replace(' ', '.')}-track`) as HTMLInputElement;
-            if (trackInput === null) continue;
-
-            trackInput.value = properties.Tracks.join(",");
-        }
-    }
-
-    function MinimizeProperty(propertyName: string): void {
-        let propertyContainer = document.querySelector(`.${propertyName.replace(' ', '.')}-propertyDetail`);
-        if (propertyContainer === null) return;
-
-        propertyContainer.classList.toggle("minimized");
     }
 
 </script>
 
 
 <main id={componentID}>
-    <button on:click={AddNewProperty}>add new</button>
-    <div id="autoGenList">
-        {#each Object.entries(_Properties) as [_, properties]}
-
-            <div class={`${properties.Name}-propertyContainer`}>
-                <div class={`${properties.Name}-propertyHeader`}>
-                    <h1>{properties.Name}</h1>
-                    <button on:click={() => { MinimizeProperty(properties.Name) }}>Minimize</button>
-                    <button on:click={() => { ApplyProperties(properties) }}>Apply</button>
-                </div>
-
-                <div class={`${properties.Name}-propertyDetail`}>
-                    <label for={`${properties.Name}-keybindEnabled`}>Enable Keybind</label>
-                    <input type="checkbox" id={`${properties.Name}-keybindEnabled`} bind:checked={properties.KeybindEnabled}>
-
-                    <label for={`${properties.Name}-name`}>Name</label>
-                    <input type="text" id={`${properties.Name}-name`} class=propertyNameInput bind:value={properties.Name} pattern="^[a-zA-Z0-9]+$">
-
-                    <label for={`${properties.Name}-append`}>Append</label>
-                    <input type="checkbox" id={`${properties.Name}-append`} bind:checked={properties.Append}>
-
-                    <label for={`${properties.Name}-track`}>Tracks</label>
-                    <input type="text" id={`${properties.Name}-track`} on:change={(e) => { TrackInputChange(e, properties.Name)}}>
-                    <img src="../src/assets/Info.svg" alt="Info" id={`${properties.Name}-trackInfo`}>
-
-                    <button on:click={() => { AddItemProperties(properties) }}>Set Properties</button>
-
-                    <button on:click={() => { RemoveProperty(properties.Name) }}>Remove</button>
-                </div>
-            </div>
-
-        {/each}
-    </div>
+    <button id="clampButton" on:click={Clamp}>Clamp</button>
 </main>
 
 
 <style lang="scss">
+    @use '../src/scss/Colors';
 
+    main {
+        width: 100%;
 
-
-
-    .propertyNameInput:invalid {
-        background-color: #ff8b8b;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }
 
-    .minimized {
-        display: none;
+    #clampButton {
+        width: 4rem;
+        height: 3rem;
+
+        background-color: Colors.$BackgroundColor;
+        color: Colors.$TextColor;
+        font-size: 1rem;
+
+        border: none;
+        border-radius: 0.5em;
+
+        margin: 0.25rem;
+
+        cursor: pointer;
+
+        outline: none;
+
+        transition: transform 0.1s ease-in-out;
+
+        &:hover {
+            transform: scale(0.9)
+        }
+
+        &:active {
+            transform: scale(0.8)
+        }
     }
 
 </style>
