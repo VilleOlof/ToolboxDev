@@ -1781,7 +1781,7 @@ declare type Timeline = {
     /**
      * Creates a compound clip of input timeline items with an optional clipInfo map: {“startTimecode” : “00:00:00:00”, “name” : “Compound Clip 1”}. It returns the created timeline item.
      */
-    CreateCompoundClip(timelineItems: TimelineItem[], clipInfo: ClipInfo): TimelineItem;
+    CreateCompoundClip(timelineItems: TimelineItem[], clipInfo: {}): TimelineItem;
     
     /**
      * Creates a Fusion clip of input timeline items. It returns the created timeline item.
@@ -1863,7 +1863,7 @@ declare type Timeline = {
      * @param trackType 
      * @param audioChannelSubType 
      */
-    AddTrack(trackType: ResolveEnums.TrackType, audioChannelSubType: string): boolean;
+    AddTrack(trackType: ResolveEnums.TrackType, audioChannelSubType?: string): boolean;
 
     /**
      * **Undocumented**
