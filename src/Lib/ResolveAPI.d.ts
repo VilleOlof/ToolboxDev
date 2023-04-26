@@ -493,9 +493,9 @@ declare type Resolution = {
  * Clip Information
  */
 declare type ClipInfo = {
-    mediaPoolItem: MediaPoolItem;
-    startFrame: number;
-    endFrame: number;
+    mediaPoolItem?: MediaPoolItem;
+    startFrame?: number;
+    endFrame?: number;
     mediaType?: number = 1 | 2;
     
     //**Undocumented**//
@@ -1408,7 +1408,7 @@ declare type MediaPool = {
      * (Look at the clipInfo type for more information)
      * Returns the list of appended timelineItems.
      */
-    AppendToTimeline(...clipInfo: ClipInfo): TimelineItem[];
+    AppendToTimeline(clipInfo: ClipInfo[]): TimelineItem[];
     
     /**
      * Creates new timeline with specified name, and appends the specified MediaPoolItem objects.
@@ -1863,7 +1863,7 @@ declare type Timeline = {
      * @param trackType 
      * @param audioChannelSubType 
      */
-    AddTrack(trackType: ResolveEnums.TrackType, audioChannelSubType?: string): boolean;
+    AddTrack(trackType: ResolveEnums.TrackType | string, audioChannelSubType?: string): boolean;
 
     /**
      * **Undocumented**
