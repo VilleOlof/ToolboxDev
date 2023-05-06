@@ -1,5 +1,6 @@
 import { DataStore } from "../Stores/DataStore";
 import { Common } from "./Common";
+import { Logger } from "./Logger";
 
 /**
  * The global settings namespace.
@@ -45,9 +46,13 @@ namespace GlobalSettings {
         }
 
         SettingsData.Set("ShowSettingsMenu", false);
+
+        Logger.Log("GlobalSettings loaded", "info", "file");
     }
 
+    export let DisableSettingButton: boolean = true;
     export function ChangeShowSettingsMenu(): void {
+        if (DisableSettingButton) return;
         let showSettingsMenu: boolean = SettingsData.Get<boolean>("ShowSettingsMenu", false);
         SettingsData.Set("ShowSettingsMenu", (!showSettingsMenu));
     }
@@ -101,7 +106,7 @@ namespace GlobalSettings {
         GlobalSettings._ComponentSettings[componentID] = _Settings;
 
         Common.IO.WriteFile(
-            Common.IO.GetRootFolder() + "./../Settings.json", 
+            Common.IO.GetRootFolder() + "/../Settings.json", 
             GlobalSettings._ComponentSettings, 
             true
         );
@@ -130,6 +135,17 @@ namespace GlobalSettings {
         SettingsInstance = undefined;
     }
 
+    /**
+     * Resets all the settings for a component to their default values.
+     * 
+     * @param componentID The component ID.
+     * 
+     * @example
+     * 
+     * ```ts
+     * GlobalSettings.ResetAllComponentSettings("ComponentID");
+     * ```
+     */
     export function ResetAllComponentSettings(componentID: string): void {
         let settings = GlobalSettings.GetComponentSettingsByID(componentID);
         let allSettings = settings.GetAllComponentSettings();
@@ -144,6 +160,17 @@ namespace GlobalSettings {
         GlobalSettings.Save(componentID, settings);
     }
 
+    /**
+     * Handles the setting input for a component.
+     * 
+     * @param input The setting input.
+     * 
+     * @example
+     * 
+     * ```ts
+     * GlobalSettings.HandleSettingInput(input);
+     * ```
+     */
     export async function HandleSettingInput(input: SettingTypes.SettingInput): Promise<void> {
         if (input.Validate && !ValidateSettingInput(input.Event)) return;
 
@@ -629,6 +656,14 @@ class Settings {
      * 
      * @param settingName The name of the setting
      * @param callback The callback to call when the setting is reset
+     * 
+     * @example
+     * 
+     * ```ts
+     * settings.AddResetCallback("Increment", () => {
+     *    console.log("Increment was reset!");
+     * });
+     * ```
      */
     public AddResetCallback(settingName: string, callback: Function): void {
         this._ResetCallbacks[settingName] = callback;
@@ -638,6 +673,12 @@ class Settings {
      * Removes a reset callback.
      * 
      * @param settingName The name of the setting
+     * 
+     * @example
+     * 
+     * ```ts
+     * settings.RemoveResetCallback("Increment");
+     * ```
      */
     public RemoveResetCallback(settingName: string): void {
         delete this._ResetCallbacks[settingName];
@@ -647,6 +688,12 @@ class Settings {
      * Calls a reset callback.
      * 
      * @param settingName The name of the setting
+     * 
+     * @example
+     * 
+     * ```ts
+     * settings.CallResetCallback("Increment");
+     * ```
      */
     public CallResetCallback(settingName: string): void {
         if (!this._ResetCallbacks[settingName]) return;

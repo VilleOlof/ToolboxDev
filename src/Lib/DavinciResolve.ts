@@ -1,8 +1,11 @@
-
+import { AppSettings } from "./AppSettings";
 import { Common } from "./Common";
+import { Logger } from "./Logger";
+import { ResolveEnums } from "./ResolveEnums";
 
 let PluginID: string;
-const WorkflowIntegration = require('../src/Lib/WorkflowIntegration.node'); //Runs from the /dist directory
+//const WorkflowIntegration = require('../src/Lib/WorkflowIntegration.node'); //Runs from the /dist directory
+const WorkflowIntegration = require('../../../Developer/Workflow Integrations/Examples/SamplePlugin/WorkflowIntegration.node');
 
 /**
  * The Resolve API
@@ -15,13 +18,15 @@ export let Resolve: Resolve;
  * This should be called by the Plugin at startup
  */
 export function InitPlugin(): boolean {
-    PluginID = 'com.villeolof.toolboxdev';
+    PluginID = AppSettings.GetMetadata().PluginID;
 
     const isInitialized = WorkflowIntegration.Initialize(PluginID);
     console.log(`Plugin initialized: ${isInitialized}`);
 
     Resolve = WorkflowIntegration.GetResolve();
     //ResolveWorkerHandler.Init();
+
+    Logger.Log(`Plugin initialized: [${PluginID}, ${AppSettings.GetMetadata().Version}]`, 'info', 'file')
 
     return isInitialized;
 }
@@ -58,16 +63,17 @@ export function PluginCleanUp(): void {
  * @param quitResolve Whether or not to quit Resolve
  */
 export function AppQuit(quitResolve: boolean = false): void {
-    // AppSettings.SetSetting('WindowSize', {
-    //     width: window.innerWidth,
-    //     height: window.innerHeight
-    // })
+    const bounds = Common.Electron.GetCurrentWindow().getBounds();
+    AppSettings.SetSetting('WindowSize', {
+        width: bounds.width,
+        height: bounds.height
+    })
 
-    // const position = Common.Electron.GetCurrentWindow().getPosition();
-    // AppSettings.SetSetting('WindowPosition', {
-    //     x: position[0],
-    //     y: position[1]
-    // });
+    const position = Common.Electron.GetCurrentWindow().getPosition();
+    AppSettings.SetSetting('WindowPosition', {
+        x: position[0],
+        y: position[1]
+    });
 
     if (quitResolve) {
         QuitResolve();
@@ -77,6 +83,25 @@ export function AppQuit(quitResolve: boolean = false): void {
     }
 
     Common.Electron.GetCurrentWindow().close();
+}
+
+const MarkerHexLookup: {[key: string]: string} = {
+    'Blue': "007FE3",
+    "Cocoa": "C4915E",
+    "Cream": "F5EBE1",
+    "Cyan": "00CED0",
+    "Fushsia": "C02E6F",
+    "Green": "00AD00",
+    "Lavender": "A193C8",
+    "Lemon": "DCE95A",
+    "Mint": "72DB00",
+    "Pink": "FF44C8",
+    "Purple": "9013FE",
+    "Red": "E12401",
+    "Rose": "FFA1B9",
+    "Sand": "C4915E",
+    "Sky": "92E2FD",
+    "Yellow": "F09D00"
 }
 
 /**
@@ -287,7 +312,7 @@ export class ResolveFunctions {
             ResolveFunctions.ForceUpdateCurrentProject();
             ResolveFunctions.ForceUpdateCurrentTimeline();
 
-            let DelaySeconds: number = 1;
+            let DelaySeconds: number = AppSettings.GetSetting("UpdateLoop_DelaySeconds", 4);
             this._DataLoop = ResolveFunctions.UpdateDataLoop(DelaySeconds);
         }
 
@@ -342,7 +367,7 @@ export class ResolveFunctions {
             }
 
         }, delaySeconds * 1000);
-
+        
         return dataLoop;
     }
 
@@ -442,6 +467,7 @@ export class ResolveFunctions {
      * ```
      */
     private static NotifySubscribers<T>(SubscribeType: any, object: T): void {
+        Logger.Log(`ResolveFunctions [${SubscribeType}] Changed`, 'info', 'file');
         if (!this.CheckIfSubscribeTypeExists(SubscribeType)) return;
         ResolveFunctions._ChangeCallbacks[SubscribeType].forEach(callback => callback(object));
     }
@@ -573,11 +599,7 @@ export class ResolveFunctions {
 
         //check if tracks is an array, if not, make it an array
         let userInputTracks: number[] = []
-        if (typeof tracks == 'number') {
-            for (let i = 0; i < tracks; i++) {
-                userInputTracks.push(i + 1);
-            }
-        }
+        if (!Array.isArray(tracks)) userInputTracks = [tracks];
         else userInputTracks = tracks;
 
         const StartFrame = 0;
@@ -585,14 +607,18 @@ export class ResolveFunctions {
 
         const EndFrame = currentTimeline.GetEndFrame() - timelineStartFrame;
 
-        const Playhead = this.ConvertTimecodeToFrames(currentTimeline.GetCurrentTimecode()) - timelineStartFrame;
+        let Playhead = this.ConvertTimecodeToFrames(currentTimeline.GetCurrentTimecode()) - timelineStartFrame;
+        Playhead += 1;
 
         const timelineTracks = currentTimeline.GetTrackCount(trackType);
         //Take the lowest number of tracks between the tracks array and the timeline tracks
-        const tracksToLoop = userInputTracks.length > timelineTracks ? timelineTracks : userInputTracks.length;
+        let tracksToLoop = userInputTracks.length //> timelineTracks ? timelineTracks : userInputTracks.length;
+        if (userInputTracks.length > timelineTracks) {
+            tracksToLoop = timelineTracks;
+        }
         
-        for (let trackIndex = 1; trackIndex <= tracksToLoop; trackIndex++) {
-            const trackItems = currentTimeline.GetItemListInTrack(trackType, trackIndex);
+        for (let trackIndex = 0; trackIndex < tracksToLoop; trackIndex++) {
+            const trackItems = currentTimeline.GetItemListInTrack(trackType, userInputTracks[trackIndex]);
             if (trackItems.length <= 0) continue; //no items in the track, continue to the next track
 
             const averageFramesPerItem = (EndFrame - StartFrame) / trackItems.length;
@@ -609,35 +635,37 @@ export class ResolveFunctions {
             }
 
             //special case where can we can find the item if the length is 2 or 3
-            if (trackItems.length == 2) {
-                const firstItem = trackItems[0];
-                let returnItem = trackItems[1];
+            //TODO: Some bugs with this, need to fix
+            // if (trackItems.length == 2) {
+            //     const firstItem = trackItems[0];
+            //     let returnItem = trackItems[1];
+            //     console.log(firstItem, returnItem, trackItems)
 
-                if (Playhead >= firstItem.GetStart() && Playhead <= firstItem.GetEnd()) returnItem = firstItem;
+            //     if (Playhead <= firstItem.GetEnd()) returnItem = firstItem;
                 
-                if (itemCallback === undefined) returnItems.push(returnItem);
-                else {
-                    itemCallback(returnItem, trackIndex);
-                }
-                continue;
-            }
-            else if (trackItems.length == 3) {
-                const middleItem = trackItems[1];
+            //     if (itemCallback === undefined) returnItems.push(returnItem);
+            //     else {
+            //         itemCallback(returnItem, trackIndex);
+            //     }
+            //     continue;
+            // }
+            // else if (trackItems.length == 3) {
+            //     const middleItem = trackItems[1];
 
-                const middleStart = middleItem.GetStart();
-                const middleEnd = middleItem.GetEnd();
+            //     const middleStart = middleItem.GetStart();
+            //     const middleEnd = middleItem.GetEnd();
 
-                if (Playhead >= middleStart && Playhead <= middleEnd) {
-                    if (itemCallback === undefined) returnItems.push(middleItem);
-                    else {
-                        itemCallback(middleItem, trackIndex);
-                    }
-                    continue;
-                }
+            //     if (Playhead >= middleStart && Playhead <= middleEnd) {
+            //         if (itemCallback === undefined) returnItems.push(middleItem);
+            //         else {
+            //             itemCallback(middleItem, trackIndex);
+            //         }
+            //         continue;
+            //     }
 
-                else if (Playhead < middleStart) return trackItems[0];
-                else if (Playhead > middleEnd) return trackItems[2];
-            }
+            //     else if (Playhead < middleStart) return trackItems[0];
+            //     else if (Playhead > middleEnd) return trackItems[2];
+            // }
             
             //then we do a binary search to find the item
             let left = 0;
@@ -684,6 +712,7 @@ export class ResolveFunctions {
      * @returns If its inside or not
      */
     private static CheckIfFrameIsOnItem(frame: number, item: TimelineItem): boolean {
+        if (!item) return false;
         return frame >= item.GetStart() && frame <= item.GetEnd();
     }
 
@@ -703,6 +732,88 @@ export class ResolveFunctions {
 
             if (folder.GetName() == folderName) return folder;
         }
+    }
+
+    /**
+     * Gets the HEX color of a marker
+     */
+    public static GetMarkerColorInHex(marker: Marker | ResolveEnums.MarkerColor): string {
+        const color = typeof marker == "string" ? marker : marker.color;
+        return MarkerHexLookup[color];
+    }
+
+    /**
+     * Cuts the timelineItem at the given frames
+     * And imports it into the timeline
+     * 
+     * @param CutItems The items to cut
+     * @param framesToCut The frames to cut at (Relative to the timelineItem)
+     * @returns The cut items
+     */
+    public static CutTimelineItem(CutItems: ResolveFunctions.CutItems | undefined, framesToCut: number[]): TimelineItem[] {
+        const currentTimeline = ResolveFunctions.GetCurrentTimeline();
+        const mediaPool = ResolveFunctions.GetCurrentProject().GetMediaPool();
+        if (!currentTimeline || !mediaPool) return [];
+
+        //If we don't have the cut items, we need to get them, so we assume its video track 1 and all audio tracks beneath
+        if (CutItems === undefined) {
+            CutItems = {
+                video: undefined,
+                audio: [],
+                trackToAppend: 1
+            };
+
+            CutItems.video = ResolveFunctions.GetTimelineItem(ResolveEnums.TrackType.Video, 1, currentTimeline) as TimelineItem;
+
+            const timelineAudioTrackCount = currentTimeline.GetTrackCount(ResolveEnums.TrackType.Audio);
+            for (let i = 1; i <= timelineAudioTrackCount; i++) {
+                const audioItem = ResolveFunctions.GetTimelineItem(ResolveEnums.TrackType.Audio, i, currentTimeline) as TimelineItem;
+                if (audioItem) CutItems.audio.push(audioItem);
+            }
+        }
+
+        const videoMediaPoolReference = CutItems.video.GetMediaPoolItem();
+        if (!videoMediaPoolReference) return [];
+
+        const CutStart = CutItems.video.GetStart();
+        const CutEnd = CutItems.video.GetEnd();
+
+        const CutLeftOffset = CutItems.video.GetLeftOffset();
+
+        const videoClipInfo: ClipInfo[] = [];
+
+        framesToCut.push(CutEnd - CutStart);
+        for (let i = 0; i < framesToCut.length; i++) {
+            let cutFrame = framesToCut[i];
+
+            let previousFrame = framesToCut[i - 1];
+            if (!previousFrame) previousFrame = 0;
+
+            if (i+1 == framesToCut.length) {
+                cutFrame = CutEnd - CutStart;
+            }
+            
+            if (cutFrame > CutEnd - CutStart) break;
+
+            const clipInfo: ClipInfo = {
+                mediaPoolItem: videoMediaPoolReference, //The media pool reference
+                startFrame: previousFrame + CutLeftOffset, //The start frame of the clip
+                endFrame: cutFrame + CutLeftOffset, //The end frame of the clip
+                recordFrame: CutStart + previousFrame, //Where in the timeline to put the clip
+                trackIndex: CutItems.trackToAppend, //The track to put the clip on
+            }
+
+            videoClipInfo.push(clipInfo);
+        }
+
+        //delete the old clips
+        if (CutItems.audio.length == 0) currentTimeline.DeleteClips([CutItems.video]);
+        else currentTimeline.DeleteClips([CutItems.video, ...CutItems.audio]);
+
+        //Add the new 'cut' clips
+        const videoTimelineItems = mediaPool.AppendToTimeline(videoClipInfo);
+
+        return videoTimelineItems;
     }
 }
 
@@ -732,4 +843,13 @@ export module ResolveFunctions {
      * The callback for the GetTimelineItem function
      */
     export type TimelineItemCallback = (item: TimelineItem, trackIndex: number) => void;
+
+    /**
+     * Parameter for CutTimelineItem
+     */
+    export type CutItems = {
+        video: TimelineItem,
+        audio: TimelineItem[],
+        trackToAppend: number,
+    }
 }

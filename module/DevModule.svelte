@@ -21,7 +21,6 @@
 
 <main id={componentID}>
 
-    
 </main>
 
 

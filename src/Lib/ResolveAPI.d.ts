@@ -1005,6 +1005,17 @@ declare type Resolve = {
      * @param enabled 
      */
     SetSourceViewerMode(mode: string): boolean;
+
+    /**
+     * **Undocumented**
+     * Does some kind of automated color page testing
+     */
+    TriggerCtrKTest(): boolean;
+
+    /**
+     * **Undocumented**
+     */
+    SetHighPriority(): any;
 };
 
 declare type ProjectManager = {
@@ -1132,6 +1143,12 @@ declare type ProjectManager = {
         See dbInfo type for more information.
      */
     SetCurrentDatabase(dbInfo: dbInfo): boolean;
+
+    /**
+     * Undocumented
+     * Havent been able to call it with the right arguments.
+     */
+    GetProjectLastModifiedTime(): void;
 };
 
 declare type Project = {
@@ -1322,6 +1339,14 @@ declare type Project = {
      */
     GetTimelineFromUniqueID(uniqueID: string): Timeline;
 
+    /**
+     * **Undocumented**
+     * 
+     * @param filePath
+     * @param frameOffset 
+     * @param duration 
+     */
+    InsertAudioToCurrentTrackAtPlayhead(filePath: string, frameOffset: any, duration: any): boolean;
 };
 declare type MediaStorage = {
 
@@ -1781,7 +1806,7 @@ declare type Timeline = {
     /**
      * Creates a compound clip of input timeline items with an optional clipInfo map: {“startTimecode” : “00:00:00:00”, “name” : “Compound Clip 1”}. It returns the created timeline item.
      */
-    CreateCompoundClip(timelineItems: TimelineItem[], clipInfo: {}): TimelineItem;
+    CreateCompoundClip(timelineItems: TimelineItem[], clipInfo?: {}): TimelineItem;
     
     /**
      * Creates a Fusion clip of input timeline items. It returns the created timeline item.
@@ -1913,14 +1938,14 @@ declare type Timeline = {
      * @param items 
      * @param linked 
      */
-    SetClipsLinked(items: [], linked: boolean): boolean;
+    SetClipsLinked(items: TimelineItem[], linked: boolean): boolean;
 
     /**
      * **Undocumented**
      * 
      * @param items 
      */
-    DeleteClips(items: []): boolean;
+    DeleteClips(items: TimelineItem[]): boolean;
 };
 
 declare type TimelineItem = {

@@ -1,6 +1,12 @@
 import './App.scss'
 import App from './App.svelte'
 
+import { Logger } from './Lib/Logger';
+Logger.Initialize();
+
+import { AppSettings } from './Lib/AppSettings';
+AppSettings.Init();
+
 import { InitPlugin, ResolveFunctions } from './Lib/DavinciResolve'
 InitPlugin();
 ResolveFunctions.Initialize();

@@ -4,3 +4,5 @@ docs/
 /Data.json
 /Settings.json
 InstallerBuilds/
+Logs/
+/AppSettings.json
